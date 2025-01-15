@@ -7,10 +7,19 @@ const notion = new Client({
   auth: process.env.NOTION_TOKEN
 });
 
-// Function to check for ready posts
 async function checkForReadyPosts() {
   try {
+    console.log('Checking database:', process.env.NOTION_DATABASE_ID);
+    
+    // First, try to query the database without filters
     const response = await notion.databases.query({
+      database_id: process.env.NOTION_DATABASE_ID
+    });
+    
+    console.log('Total posts in database:', response.results.length);
+    
+    // Then check for ready posts
+    const readyPosts = await notion.databases.query({
       database_id: process.env.NOTION_DATABASE_ID,
       filter: {
         property: "Status",
@@ -20,24 +29,14 @@ async function checkForReadyPosts() {
       }
     });
     
-    console.log('Found posts:', response.results.length);
+    console.log('Ready posts:', readyPosts.results.length);
     
-    for (const page of response.results) {
+    for (const page of readyPosts.results) {
       console.log('Processing post:', page.id);
-      // Mark as scheduled first
-      await notion.pages.update({
-        page_id: page.id,
-        properties: {
-          Status: {
-            select: {
-              name: "Scheduled"
-            }
-          }
-        }
-      });
+      console.log('Post status:', page.properties.Status.select.name);
     }
   } catch (error) {
-    console.error('Error checking posts:', error);
+    console.error('Error details:', error);
   }
 }
 
