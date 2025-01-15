@@ -11,32 +11,61 @@ async function checkForReadyPosts() {
   try {
     console.log('Checking database:', process.env.NOTION_DATABASE_ID);
     
-    // First, try to query the database without filters
-    const response = await notion.databases.query({
-      database_id: process.env.NOTION_DATABASE_ID
-    });
-    
-    console.log('Total posts in database:', response.results.length);
-    
-    // Then check for ready posts
+    // Look for posts with "Scheduled" status
     const readyPosts = await notion.databases.query({
       database_id: process.env.NOTION_DATABASE_ID,
       filter: {
         property: "Status",
         select: {
-          equals: "Ready"
+          equals: "Scheduled"
         }
       }
     });
     
-    console.log('Ready posts:', readyPosts.results.length);
+    console.log('Total posts in database:', readyPosts.results.length);
+    console.log('Scheduled posts:', readyPosts.results.length);
     
     for (const page of readyPosts.results) {
       console.log('Processing post:', page.id);
-      console.log('Post status:', page.properties.Status.select.name);
+      try {
+        // Get the page content
+        const pageContent = await notion.blocks.children.list({
+          block_id: page.id
+        });
+        
+        console.log('Post content length:', pageContent.results.length);
+        
+        // Update status to show we're processing it
+        await notion.pages.update({
+          page_id: page.id,
+          properties: {
+            Status: {
+              select: {
+                name: "Published"
+              }
+            }
+          }
+        });
+        
+        console.log('Status updated to Published');
+      } catch (error) {
+        console.error('Error processing post:', error);
+        
+        // Update status to Failed if there's an error
+        await notion.pages.update({
+          page_id: page.id,
+          properties: {
+            Status: {
+              select: {
+                name: "Failed"
+              }
+            }
+          }
+        });
+      }
     }
   } catch (error) {
-    console.error('Error details:', error);
+    console.error('Error checking posts:', error);
   }
 }
 
